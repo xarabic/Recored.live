@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SEVANT DRIVE</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#08111e;color:#fff;font-family:Arial,sans-serif;touch-action:none}
+#game{position:fixed;inset:0}canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px;pointer-events:none}
+.pill{background:#07111dcc;border:1px solid #5be0ff66;border-radius:12px;padding:9px 12px;font-weight:bold;font-size:13px;backdrop-filter:blur(6px)}
+#hint{position:fixed;top:58px;left:12px;right:12px;text-align:center;color:#d9f6ff;font-size:12px;text-shadow:0 2px 4px #000;pointer-events:none}
+#controls{position:fixed;bottom:max(18px,env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:space-between;align-items:end;padding:0 18px;gap:10px}
+.group{display:flex;gap:10px}
+.ctrl{width:64px;height:64px;border-radius:18px;border:1px solid #a6eeff99;background:#071b2ddd;color:white;font-size:25px;font-weight:bold;box-shadow:0 5px 20px #0008;touch-action:none;user-select:none}
+.ctrl:active{background:#00a9d9}
+.ctrl.go{width:76px;height:76px;border-radius:50%;background:#00a6c9e8}
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(#06101eee,#06101ecc);text-align:center;padding:25px;font-weight:bold;line-height:1.8}
+#loading small{display:block;font-weight:normal;color:#b7d5e0}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud"><div class="pill">SEVANT DRIVE</div><div class="pill">السرعة: <span id="speed">0</span> كم/س</div></div>
+<div id="hint">اضغط مطولًا على دواسة الوقود للقيادة</div>
+<div id="controls">
+ <div class="group"><button class="ctrl" id="left">◀</button><button class="ctrl" id="right">▶</button></div>
+ <div class="group"><button class="ctrl" id="brake">▼</button><button class="ctrl go" id="gas">▲</button></div>
+</div>
+<div id="loading">جاري تحميل السيارة والعالم...<small>إذا لم تظهر السيارة، تأكد أن ملف سيارة.glb بجانب index.html.</small></div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+const root=document.querySelector('#game'),loading=document.querySelector('#loading');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x07101f); scene.fog=new THREE.Fog(0x07101f,35,150);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,300); camera.position.set(0,5.4,9.5);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false}); renderer.setPixelRatio(Math.min(devicePixelRatio,1.7)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; renderer.outputColorSpace=THREE.SRGBColorSpace; root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xb8e4ff,0x22202b,2.1));
+const moon=new THREE.DirectionalLight(0xd6e7ff,2.4); moon.position.set(-5,12,7); moon.castShadow=true; scene.add(moon);
+const roadMat=new THREE.MeshStandardMaterial({color:0x252b35,roughness:.9});
+const road=new THREE.Mesh(new THREE.PlaneGeometry(13,260),roadMat); road.rotation.x=-Math.PI/2; road.position.set(0,-.04,-70); road.receiveShadow=true; scene.add(road);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(220,300),new THREE.MeshStandardMaterial({color:0x101d28}));ground.rotation.x=-Math.PI/2;ground.position.set(0,-.12,-65);scene.add(ground);
+const lineMat=new THREE.MeshBasicMaterial({color:0xd4e8ee});
+const marks=[];
+for(let z=-180;z<20;z+=12){let m=new THREE.Mesh(new THREE.BoxGeometry(.12,.025,5),lineMat);m.position.set(0,.015,z);scene.add(m);marks.push(m)}
+for(let x of [-6.2,6.2]){let edge=new THREE.Mesh(new THREE.BoxGeometry(.13,.03,260),new THREE.MeshBasicMaterial({color:0x00cfff}));edge.position.set(x,.015,-70);scene.add(edge)}
+// Night city blocks
+const buildings=[];
+for(let side of [-1,1])for(let i=0;i<34;i++){let h=4+Math.random()*22,w=2+Math.random()*4,d=3+Math.random()*6;let mat=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(.58+Math.random()*.08,.22,.12+Math.random()*.12),emissive:0x091c31,roughness:.9});let b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);b.position.set(side*(11+Math.random()*22),h/2,-i*8-10);scene.add(b);buildings.push({b,side,h,w,d});for(let j=0;j<Math.floor(h/2);j++){let win=new THREE.Mesh(new THREE.BoxGeometry(.09,.18,.09),new THREE.MeshBasicMaterial({color:Math.random()>.45?0x55cfff:0xffc76b}));win.position.set(b.position.x-side*(w/2+.06),1+j*1.5,b.position.z+(Math.random()-.5)*d);scene.add(win)}}
+const carGroup=new THREE.Group();scene.add(carGroup);
+let carLoaded=false;
+new GLTFLoader().load('./سيارة.glb',g=>{
+ const model=g.scene; const box=new THREE.Box3().setFromObject(model); const size=box.getSize(new THREE.Vector3()); const center=box.getCenter(new THREE.Vector3());
+ model.position.sub(center);
+ const maxDim=Math.max(size.x,size.y,size.z); const scale=4.25/Math.max(size.x,size.z); model.scale.setScalar(scale);
+ model.position.y=0;
+ model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material.needsUpdate=true}}});
+ carGroup.add(model);
+ const b2=new THREE.Box3().setFromObject(model); model.position.y-=b2.min.y;
+ carLoaded=true; loading.classList.add('hidden');
+},undefined,e=>{loading.innerHTML='تعذر تحميل السيارة.<small>تأكد أن سيارة.glb موجود بجانب index.html وأن الإنترنت يعمل.</small>';});
+const inputs={left:false,right:false,gas:false,brake:false};
+function hold(id,key){const el=document.getElementById(id);const on=e=>{e.preventDefault();inputs[key]=true;};const off=e=>{e.preventDefault();inputs[key]=false;};el.addEventListener('pointerdown',on);['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,off));}
+hold('left','left');hold('right','right');hold('gas','gas');hold('brake','brake');
+let speed=0,steer=0,clock=new THREE.Clock();
+function animate(){requestAnimationFrame(animate);let dt=Math.min(clock.getDelta(),.05);
+ if(inputs.gas)speed=Math.min(42,speed+20*dt);else speed=Math.max(0,speed-5*dt);
+ if(inputs.brake)speed=Math.max(0,speed-34*dt);
+ const dir=(inputs.left?1:0)-(inputs.right?1:0); steer=THREE.MathUtils.lerp(steer,dir,.09);carGroup.position.x=THREE.MathUtils.clamp(carGroup.position.x+steer*speed*.035,-4.5,4.5);
+ carGroup.rotation.y=THREE.MathUtils.lerp(carGroup.rotation.y,-steer*.08,.08);
+ for(const m of marks){m.position.z+=speed*dt;if(m.position.z>12)m.position.z=-185}
+ for(const o of buildings){o.b.position.z+=speed*dt*.65;if(o.b.position.z>15)o.b.position.z=-260}
+ camera.position.x=THREE.MathUtils.lerp(camera.position.x,carGroup.position.x*.35,.05);camera.lookAt(carGroup.position.x*.3,1,-5);
+ document.getElementById('speed').textContent=Math.round(speed*4);
+ renderer.render(scene,camera);
+}animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body></html>
